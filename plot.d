@@ -1,8 +1,9 @@
+#!/usr/bin/env rdmd
 module plot;
 
 import std.process;
 import std.string;
-import std.stdio: writeln;
+import std.stdio;
 import std.file;
 
 class ExitException : Exception
@@ -41,12 +42,14 @@ int main(string[] args)
             set logscale x 2
             set xlabel 'size in bytes'
             set ylabel 'GB/s'
-            set terminal qt size 900,480
-            plot '` ~ args[1] ~ `' using "size(bytes)":"memcpyC(GB/s)" with lines, '' using "size(bytes)":"memcpyD(GB/s)" with lines
+            set terminal x11 size 900,480
+            plot '` ~ args[1] ~ `' using "size(bytes)":"memcpyC(GB/s)" with lines, '' using "size(bytes)":"memcpyD(GB/s)" with lines, \
+                 '` ~ args[2] ~ `' using "size(bytes)":"memcpyC(GB/s)" with lines, '' using "size(bytes)":"memcpyD(GB/s)" with lines
             `);
     }
     catch(ExitException e)
     {
+		writefln("We failed to run the code. rc = %d", e.status);
         return e.status;
     }
 
