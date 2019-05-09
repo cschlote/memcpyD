@@ -1,8 +1,11 @@
+#!/usr/bin/env rdmd -O
+
 import std.datetime.stopwatch;
 import core.stdc.string;
 import std.random;
 import std.traits;
 import std.stdio;
+import std.stdint;
 
 private struct S16 { ubyte[16] x; }
 private struct S32 { ubyte[32] x; }
@@ -229,19 +232,31 @@ void test(T)()
 {
     // Just an arbitrarily sized buffer big enought to store test data
     // We will offset from this buffer to create unaligned data
-    ubyte[66000] buf1;
-    ubyte[66000] buf2;
+	stderr.writefln( "Testing size %d (%s)", T.sizeof, T.stringof);
+    ubyte[2*66000] buf1store;
+    ubyte[2*66000] buf2store;
+    intptr_t buf1ao = (cast(intptr_t)buf1store.ptr + 2^^16) & ~(2^^16-1);
+	ubyte *buf1 = cast(ubyte*)buf1ao;
+	stderr.writefln( "Addr1 %08x %08x", buf1store.ptr, buf1);
+    intptr_t buf2ao = (cast(intptr_t)buf2store.ptr + 2^^16) & ~(2^^16-1);
+	ubyte *buf2 = cast(ubyte*)buf2ao;
+	stderr.writefln( "Addr2 %08x %08x", buf2store.ptr, buf2);
+	stderr.flush;
 
     double TotalGBperSec1 = 0.0;
     double TotalGBperSec2 = 0.0;
-    enum alignments = 16;
+    immutable alignoffsets = [ 0, 1, 2, 4, 8, 16 ];
+    enum alignments = alignoffsets.length;
 
     // test align(0) through align(16) for now
     foreach(i; 0..alignments)
     {
+		auto offset = alignoffsets[i];
+		if (offset >= T.sizeof) break;
+
         {
-            T* d = cast(T*)(&buf1[i]);
-            T* s = cast(T*)(&buf2[i]);
+            T* d = cast(T*)(&buf1[offset]);
+            T* s = cast(T*)(&buf2[offset]);
 
             init(d);
             init(s);
@@ -271,7 +286,7 @@ void test(T)()
             }
             else
             {
-                writeln(T.sizeof, " ", GBperSec1, " ", GBperSec2);
+                writeln(T.sizeof, " ", offset, " ", GBperSec1, " ", GBperSec2);
                 stdout.flush();
             }
         }
@@ -279,7 +294,7 @@ void test(T)()
 
     if (average)
     {
-        writeln(T.sizeof, " ", TotalGBperSec1 / alignments, " ", TotalGBperSec2 / alignments);
+        writeln(T.sizeof, " ", -1, " ", TotalGBperSec1 / alignments, " ", TotalGBperSec2 / alignments);
         stdout.flush();
     }
 }
@@ -307,7 +322,7 @@ void main(string[] args)
     average = args.length >= 2;
 
     // For performing benchmarks
-    writeln("size(bytes) memcpyC(GB/s) memcpyD(GB/s)");
+    writeln("size(bytes) alignment memcpyC(GB/s) memcpyD(GB/s)");
     stdout.flush();
     test!S1;
     test!S2;
